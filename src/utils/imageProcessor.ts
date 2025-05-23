@@ -68,61 +68,56 @@ const createCombinedImage = async (
     
     const checkBothLoaded = () => {
       if (leftLoaded && rightLoaded) {
-        const drawImage = (img: HTMLImageElement, transform: any, x: number) => {
+        const drawImage = (img: HTMLImageElement, file: FileData, x: number) => {
           const targetWidth = canvas.width / 2;
           const targetHeight = canvas.height;
           
-          const aspectRatio = img.width / img.height;
-          let drawWidth = targetWidth;
-          let drawHeight = targetHeight;
+          let sourceX = 0;
+          let sourceY = 0;
+          let sourceWidth = img.width;
+          let sourceHeight = img.height;
           
-          if (aspectRatio > targetWidth / targetHeight) {
-            drawHeight = targetWidth / aspectRatio;
-          } else {
-            drawWidth = targetHeight * aspectRatio;
+          if (file.crop) {
+            sourceX = file.crop.x;
+            sourceY = file.crop.y;
+            sourceWidth = file.crop.width;
+            sourceHeight = file.crop.height;
           }
           
-          const baseX = x + (targetWidth - drawWidth) / 2;
-          const baseY = (targetHeight - drawHeight) / 2;
+          const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
+          const scaledWidth = sourceWidth * scale * (file.zoom || 1);
+          const scaledHeight = sourceHeight * scale * (file.zoom || 1);
+          
+          const drawX = x + (targetWidth - scaledWidth) / 2;
+          const drawY = (targetHeight - scaledHeight) / 2;
           
           ctx.save();
-          
-          // Apply transformations relative to the center of the image's space
-          const centerX = x + targetWidth / 2;
-          const centerY = targetHeight / 2;
-          
-          ctx.translate(centerX, centerY);
-          
-          if (transform) {
-            // Apply scale
-            ctx.scale(transform.scale, transform.scale);
-            
-            // Apply rotation (convert to radians)
-            ctx.rotate((transform.rotation * Math.PI) / 180);
-            
-            // Apply position
-            ctx.translate(transform.position.x / transform.scale, transform.position.y / transform.scale);
+          ctx.translate(x + targetWidth / 2, targetHeight / 2);
+          if (file.transform) {
+            ctx.rotate((file.transform.rotation * Math.PI) / 180);
+            ctx.scale(file.transform.scale, file.transform.scale);
+            ctx.translate(file.transform.position.x, file.transform.position.y);
           }
+          ctx.translate(-targetWidth / 2, -targetHeight / 2);
           
-          // Draw relative to center
           ctx.drawImage(
             img,
-            -drawWidth / 2,
-            -drawHeight / 2,
-            drawWidth,
-            drawHeight
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            drawX,
+            drawY,
+            scaledWidth,
+            scaledHeight
           );
           
           ctx.restore();
         };
 
-        // Draw left image with its transform
-        drawImage(leftImg, leftFile.transform, 0);
-        
-        // Draw right image with its transform
-        drawImage(rightImg, rightFile.transform, canvas.width / 2);
+        drawImage(leftImg, leftFile, 0);
+        drawImage(rightImg, rightFile, canvas.width / 2);
 
-        // Draw text if enabled
         if (textOptions?.enabled && textOptions?.text) {
           const fontStyle = [];
           if (textOptions.bold) fontStyle.push('bold');
@@ -138,24 +133,22 @@ const createCombinedImage = async (
           let textX = 0;
           let textY = 0;
           
-          const padding = 20;
-          
           switch (textOptions.position) {
             case 'top-left':
-              textX = padding;
-              textY = textHeight + padding;
+              textX = 20;
+              textY = textHeight + 20;
               break;
             case 'top-right':
-              textX = canvas.width - metrics.width - padding;
-              textY = textHeight + padding;
+              textX = canvas.width - metrics.width - 20;
+              textY = textHeight + 20;
               break;
             case 'bottom-left':
-              textX = padding;
-              textY = canvas.height - padding;
+              textX = 20;
+              textY = canvas.height - 20;
               break;
             case 'bottom-right':
-              textX = canvas.width - metrics.width - padding;
-              textY = canvas.height - padding;
+              textX = canvas.width - metrics.width - 20;
+              textY = canvas.height - 20;
               break;
           }
           
@@ -175,11 +168,7 @@ const createCombinedImage = async (
           name,
           leftPhoto: leftFile.preview,
           rightPhoto: rightFile.preview,
-          textOptions,
-          transform: {
-            left: leftFile.transform,
-            right: rightFile.transform
-          }
+          textOptions
         });
       }
     };
