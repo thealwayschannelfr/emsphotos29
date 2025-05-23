@@ -37,7 +37,8 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     const image = processedImages[index];
     const link = document.createElement('a');
     link.href = image.dataUrl;
-    link.download = `combined_${image.name}.jpg`;
+    //link.download = `combined_${image.name}.jpg`;
+    link.download = `${image.name}_combined.jpg`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
