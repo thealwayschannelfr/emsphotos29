@@ -91,6 +91,15 @@ const createCombinedImage = async (
           const drawX = x + (targetWidth - scaledWidth) / 2;
           const drawY = (targetHeight - scaledHeight) / 2;
           
+          ctx.save();
+          ctx.translate(x + targetWidth / 2, targetHeight / 2);
+          if (file.transform) {
+            ctx.rotate((file.transform.rotation * Math.PI) / 180);
+            ctx.scale(file.transform.scale, file.transform.scale);
+            ctx.translate(file.transform.position.x, file.transform.position.y);
+          }
+          ctx.translate(-targetWidth / 2, -targetHeight / 2);
+          
           ctx.drawImage(
             img,
             sourceX,
@@ -102,16 +111,20 @@ const createCombinedImage = async (
             scaledWidth,
             scaledHeight
           );
+          
+          ctx.restore();
         };
 
         drawImage(leftImg, leftFile, 0);
         drawImage(rightImg, rightFile, canvas.width / 2);
 
-        if (textOptions?.text) {
-          ctx.font = `${textOptions.size}px ${textOptions.font}`;
-          ctx.fillStyle = '#000000';
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 2;
+        if (textOptions?.enabled && textOptions?.text) {
+          const fontStyle = [];
+          if (textOptions.bold) fontStyle.push('bold');
+          if (textOptions.italic) fontStyle.push('italic');
+          
+          ctx.font = `${fontStyle.join(' ')} ${textOptions.size}px ${textOptions.font}`;
+          ctx.fillStyle = textOptions.color || '#000000';
           
           const text = textOptions.text;
           const metrics = ctx.measureText(text);
@@ -139,7 +152,12 @@ const createCombinedImage = async (
               break;
           }
           
-          ctx.strokeText(text, textX, textY);
+          if (textOptions.stroke) {
+            ctx.strokeStyle = textOptions.strokeColor || '#FFFFFF';
+            ctx.lineWidth = textOptions.strokeWidth || 2;
+            ctx.strokeText(text, textX, textY);
+          }
+          
           ctx.fillText(text, textX, textY);
         }
         

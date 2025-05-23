@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Download, ArrowDown, Check, Edit2, Type, Move, ZoomIn } from 'lucide-react';
 import { ProcessedImage, TextOptions, FileData } from '../types';
 import TextOptionsPanel from './TextOptions';
 import { downloadAsZip } from '../utils/imageProcessor';
+import TransformableImage from './TransformableImage';
 
 interface ResultsSectionProps {
   processedImages: ProcessedImage[];
@@ -20,11 +21,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
   );
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [downloadedIndices, setDownloadedIndices] = useState<number[]>([]);
-  const [editingPhoto, setEditingPhoto] = useState<'left' | 'right' | null>(null);
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+  const [selectedSide, setSelectedSide] = useState<'left' | 'right' | null>(null);
 
   const handleDownloadAll = async () => {
     setDownloadingAll(true);
@@ -44,40 +41,25 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     setDownloadedIndices(prev => [...prev, index]);
   };
 
-  const handlePhotoClick = (side: 'left' | 'right') => {
-    setEditingPhoto(side);
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!editingPhoto) return;
-    setIsDragging(true);
-    setStartPos({ x: e.clientX - position.x, y: e.clientY - position.y });
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !editingPhoto) return;
-    const newX = e.clientX - startPos.x;
-    const newY = e.clientY - startPos.y;
-    setPosition({ x: newX, y: newY });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleScaleChange = (newScale: number) => {
-    setScale(newScale);
+  const handleTransformUpdate = (side: 'left' | 'right', transform: any) => {
+    if (selectedImage === null) return;
+    
+    const updatedImage = {
+      ...processedImages[selectedImage],
+      transform: {
+        ...processedImages[selectedImage].transform,
+        [side]: transform
+      }
+    };
+    onImageUpdate(selectedImage, updatedImage);
   };
 
   const handleTextOptionsChange = (newOptions: TextOptions) => {
+    if (selectedImage === null) return;
+    
     const updatedImage = {
       ...processedImages[selectedImage],
-      textOptions: {
-        ...newOptions,
-        enabled: newOptions.enabled || textOptions.enabled
-      }
+      textOptions: newOptions
     };
     onImageUpdate(selectedImage, updatedImage);
   };
@@ -130,63 +112,29 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
       
       {selectedImage !== null && (
         <div className="flex flex-col items-center">
-          <div 
-            className="relative w-full aspect-video rounded-lg overflow-hidden mb-4 flex"
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-          >
+          <div className="relative w-full aspect-video rounded-lg overflow-hidden mb-4 flex bg-gray-100">
             <div 
-              className="w-1/2 h-full cursor-pointer relative"
-              onMouseDown={handleMouseDown}
-              onDoubleClick={() => handlePhotoClick('left')}
-              style={{
-                transform: editingPhoto === 'left' ? `scale(${scale}) translate(${position.x}px, ${position.y}px)` : 'none'
-              }}
+              className={`w-1/2 h-full relative ${selectedSide === 'left' ? 'ring-2 ring-indigo-500' : ''}`}
+              onClick={() => setSelectedSide(prev => prev === 'left' ? null : 'left')}
             >
-              <img
+              <TransformableImage
                 src={processedImages[selectedImage].leftPhoto}
-                alt="Left photo"
-                className="w-full h-full object-cover"
+                isSelected={selectedSide === 'left'}
+                transform={processedImages[selectedImage].transform?.left}
+                onTransformChange={(transform) => handleTransformUpdate('left', transform)}
               />
             </div>
             <div 
-              className="w-1/2 h-full cursor-pointer relative"
-              onMouseDown={handleMouseDown}
-              onDoubleClick={() => handlePhotoClick('right')}
-              style={{
-                transform: editingPhoto === 'right' ? `scale(${scale}) translate(${position.x}px, ${position.y}px)` : 'none'
-              }}
+              className={`w-1/2 h-full relative ${selectedSide === 'right' ? 'ring-2 ring-indigo-500' : ''}`}
+              onClick={() => setSelectedSide(prev => prev === 'right' ? null : 'right')}
             >
-              <img
+              <TransformableImage
                 src={processedImages[selectedImage].rightPhoto}
-                alt="Right photo"
-                className="w-full h-full object-cover"
+                isSelected={selectedSide === 'right'}
+                transform={processedImages[selectedImage].transform?.right}
+                onTransformChange={(transform) => handleTransformUpdate('right', transform)}
               />
             </div>
-            
-            {editingPhoto && (
-              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-4 flex items-center space-x-4">
-                <div className="flex items-center">
-                  <ZoomIn className="h-4 w-4 mr-2" />
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="2"
-                    step="0.1"
-                    value={scale}
-                    onChange={(e) => handleScaleChange(parseFloat(e.target.value))}
-                    className="w-32"
-                  />
-                </div>
-                <button
-                  onClick={() => setEditingPhoto(null)}
-                  className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md"
-                >
-                  Apply
-                </button>
-              </div>
-            )}
           </div>
           
           <div className="flex space-x-4 mb-4">
@@ -201,10 +149,10 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
           
           <div className="w-full max-w-md">
             <TextOptionsPanel
-              options={{
+              options={processedImages[selectedImage].textOptions || {
                 ...textOptions,
                 text: processedImages[selectedImage].name,
-                enabled: textOptions.enabled || (processedImages[selectedImage].textOptions?.enabled ?? false)
+                enabled: false
               }}
               onChange={handleTextOptionsChange}
               compact={true}
