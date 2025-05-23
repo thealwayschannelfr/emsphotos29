@@ -37,7 +37,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     const image = processedImages[index];
     const link = document.createElement('a');
     link.href = image.dataUrl;
-    //link.download = `combined_${image.name}.jpg`;
     link.download = `${image.name}_combined.jpg`;
     document.body.appendChild(link);
     link.click();
@@ -70,6 +69,17 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
 
   const handleScaleChange = (newScale: number) => {
     setScale(newScale);
+  };
+
+  const handleTextOptionsChange = (newOptions: TextOptions) => {
+    const updatedImage = {
+      ...processedImages[selectedImage],
+      textOptions: {
+        ...newOptions,
+        enabled: newOptions.enabled || textOptions.enabled
+      }
+    };
+    onImageUpdate(selectedImage, updatedImage);
   };
 
   return (
@@ -193,15 +203,10 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
             <TextOptionsPanel
               options={{
                 ...textOptions,
-                text: processedImages[selectedImage].name.replace(/_/g, ' ')
+                text: processedImages[selectedImage].name,
+                enabled: textOptions.enabled || (processedImages[selectedImage].textOptions?.enabled ?? false)
               }}
-              onChange={(newOptions) => {
-                const updatedImage = {
-                  ...processedImages[selectedImage],
-                  textOptions: newOptions
-                };
-                onImageUpdate(selectedImage, updatedImage);
-              }}
+              onChange={handleTextOptionsChange}
               compact={true}
             />
           </div>
