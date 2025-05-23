@@ -5,7 +5,8 @@ export const processImages = async (
   babyPhotos: FileData[],
   currentPhotos: FileData[],
   onProgress: (progress: number) => void,
-  globalTextOptions: TextOptions
+  globalTextOptions: TextOptions,
+  transform?: { left?: any; right?: any }
 ): Promise<ProcessedImage[]> => {
   const results: ProcessedImage[] = [];
   const totalImages = Math.min(babyPhotos.length, currentPhotos.length);
@@ -25,8 +26,8 @@ export const processImages = async (
     };
     
     const result = await createCombinedImage(
-      sortedBabyPhotos[i],
-      sortedCurrentPhotos[i],
+      { ...sortedBabyPhotos[i], transform: transform?.left },
+      { ...sortedCurrentPhotos[i], transform: transform?.right },
       formattedName,
       textOpts
     );
@@ -85,19 +86,22 @@ const createCombinedImage = async (
           }
           
           const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
-          const scaledWidth = sourceWidth * scale * (file.zoom || 1);
-          const scaledHeight = sourceHeight * scale * (file.zoom || 1);
-          
-          const drawX = x + (targetWidth - scaledWidth) / 2;
-          const drawY = (targetHeight - scaledHeight) / 2;
+          const scaledWidth = sourceWidth * scale;
+          const scaledHeight = sourceHeight * scale;
           
           ctx.save();
+          
+          // Center the image
           ctx.translate(x + targetWidth / 2, targetHeight / 2);
+          
+          // Apply transformations if they exist
           if (file.transform) {
             ctx.rotate((file.transform.rotation * Math.PI) / 180);
             ctx.scale(file.transform.scale, file.transform.scale);
             ctx.translate(file.transform.position.x, file.transform.position.y);
           }
+          
+          // Move back to draw the image
           ctx.translate(-targetWidth / 2, -targetHeight / 2);
           
           ctx.drawImage(
@@ -106,8 +110,8 @@ const createCombinedImage = async (
             sourceY,
             sourceWidth,
             sourceHeight,
-            drawX,
-            drawY,
+            x + (targetWidth - scaledWidth) / 2,
+            (targetHeight - scaledHeight) / 2,
             scaledWidth,
             scaledHeight
           );
@@ -168,7 +172,11 @@ const createCombinedImage = async (
           name,
           leftPhoto: leftFile.preview,
           rightPhoto: rightFile.preview,
-          textOptions
+          textOptions,
+          transform: {
+            left: leftFile.transform,
+            right: rightFile.transform
+          }
         });
       }
     };
