@@ -184,7 +184,8 @@ export const downloadAsZip = async (images: ProcessedImage[]) => {
   const zip = new JSZip();
   
   images.forEach((image) => {
-    const fileName = `combined_${image.name}.jpg`;
+    //const fileName = `combined_${image.name}.jpg`;
+    const fileName = `${image.name}_combined.jpg`;
     const data = image.dataUrl.split(',')[1];
     zip.file(fileName, data, { base64: true });
   });
