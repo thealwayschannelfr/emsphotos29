@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FileData } from '../types';
 import { X, FileIcon } from 'lucide-react';
@@ -25,6 +25,7 @@ const FileUploader: React.FC<FileUploaderProps> = ({
   disabled = false
 }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const folderInputRef = useRef<HTMLInputElement>(null);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map(file => ({
@@ -46,13 +47,15 @@ const FileUploader: React.FC<FileUploaderProps> = ({
     onDropAccepted: () => setIsDragging(false),
     onDropRejected: () => setIsDragging(false)
   });
+
+  const handleFolderUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    onDrop(files);
+  };
   
   const removeFile = (index: number) => {
     const newFiles = [...files];
-    
-    // Revoke the object URL to avoid memory leaks
     URL.revokeObjectURL(newFiles[index].preview);
-    
     newFiles.splice(index, 1);
     onUpload(newFiles);
   };
@@ -96,9 +99,27 @@ const FileUploader: React.FC<FileUploaderProps> = ({
           <p className="mt-2 text-sm font-medium text-gray-900">
             {isDragging ? "Drop files here" : "Drag and drop or click to select files"}
           </p>
-          <p className="mt-1 text-xs text-gray-500">
-            {multiple ? "You can upload multiple files" : "Only one file can be uploaded"}
-          </p>
+          <div className="mt-2 flex justify-center space-x-4">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (folderInputRef.current) folderInputRef.current.click();
+              }}
+              className="text-sm text-indigo-600 hover:text-indigo-700"
+            >
+              Select Folder
+            </button>
+            <input
+              ref={folderInputRef}
+              type="file"
+              webkitdirectory=""
+              directory=""
+              multiple
+              className="hidden"
+              onChange={handleFolderUpload}
+            />
+          </div>
         </div>
       </div>
       

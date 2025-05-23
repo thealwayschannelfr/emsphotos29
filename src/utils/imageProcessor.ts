@@ -4,7 +4,8 @@ import JSZip from 'jszip';
 export const processImages = async (
   babyPhotos: FileData[],
   currentPhotos: FileData[],
-  onProgress: (progress: number) => void
+  onProgress: (progress: number) => void,
+  globalTextOptions: TextOptions
 ): Promise<ProcessedImage[]> => {
   const results: ProcessedImage[] = [];
   const totalImages = Math.min(babyPhotos.length, currentPhotos.length);
@@ -13,13 +14,23 @@ export const processImages = async (
   const sortedCurrentPhotos = [...currentPhotos].sort((a, b) => a.name.localeCompare(b.name));
   
   for (let i = 0; i < totalImages; i++) {
-    const babyName = sortedBabyPhotos[i].name.split('_01')[0];
-    const currentName = sortedCurrentPhotos[i].name.split('_02')[0];
+    const babyName = sortedBabyPhotos[i].name.split('_01')[0].replace(/_/g, ' ');
+    const currentName = sortedCurrentPhotos[i].name.split('_02')[0].replace(/_/g, ' ');
+    
+    if (babyName !== currentName) {
+      console.warn(`Name mismatch: ${babyName} vs ${currentName}`);
+    }
+
+    const textOpts = {
+      ...globalTextOptions,
+      text: globalTextOptions.enabled ? (globalTextOptions.text || babyName) : ''
+    };
     
     const result = await createCombinedImage(
       sortedBabyPhotos[i],
       sortedCurrentPhotos[i],
-      babyName
+      babyName,
+      textOpts
     );
     
     results.push(result);
@@ -45,6 +56,7 @@ const createCombinedImage = async (
       return;
     }
     
+    // Set canvas to 16:9 aspect ratio
     canvas.width = 1920;
     canvas.height = 1080;
     
@@ -59,47 +71,55 @@ const createCombinedImage = async (
     
     const checkBothLoaded = () => {
       if (leftLoaded && rightLoaded) {
-        // Apply crops if specified
         const drawImage = (img: HTMLImageElement, file: FileData, x: number) => {
+          const targetWidth = canvas.width / 2;
+          const targetHeight = canvas.height;
+          
+          let sourceX = 0;
+          let sourceY = 0;
+          let sourceWidth = img.width;
+          let sourceHeight = img.height;
+          
           if (file.crop) {
-            const scale = 960 / file.crop.width;
-            const height = file.crop.height * scale;
-            ctx.drawImage(
-              img,
-              file.crop.x,
-              file.crop.y,
-              file.crop.width,
-              file.crop.height,
-              x,
-              (canvas.height - height) / 2,
-              960,
-              height
-            );
-          } else {
-            const scale = 960 / img.width;
-            const height = img.height * scale;
-            let y = (canvas.height - height) / 2;
-            
-            if (height < canvas.height) {
-              const additionalScale = canvas.height / height;
-              const newWidth = 960 * additionalScale;
-              const newHeight = height * additionalScale;
-              ctx.drawImage(img, x, 0, newWidth, newHeight);
-            } else {
-              ctx.drawImage(img, x, y, 960, height);
-            }
+            sourceX = file.crop.x;
+            sourceY = file.crop.y;
+            sourceWidth = file.crop.width;
+            sourceHeight = file.crop.height;
           }
+          
+          // Calculate scaling to maintain aspect ratio
+          const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight);
+          const scaledWidth = sourceWidth * scale;
+          const scaledHeight = sourceHeight * scale;
+          
+          // Center the image
+          const drawX = x + (targetWidth - scaledWidth) / 2;
+          const drawY = (targetHeight - scaledHeight) / 2;
+          
+          ctx.drawImage(
+            img,
+            sourceX,
+            sourceY,
+            sourceWidth,
+            sourceHeight,
+            drawX,
+            drawY,
+            scaledWidth,
+            scaledHeight
+          );
         };
 
         drawImage(leftImg, leftFile, 0);
         drawImage(rightImg, rightFile, canvas.width / 2);
 
         // Add text if enabled
-        if (textOptions?.enabled) {
+        if (textOptions?.enabled && textOptions.text) {
           ctx.font = `${textOptions.size}px ${textOptions.font}`;
           ctx.fillStyle = '#000000';
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2;
           
-          const text = textOptions.text || name.replace('_', ' ');
+          const text = textOptions.text;
           const metrics = ctx.measureText(text);
           const textHeight = textOptions.size;
           
@@ -125,6 +145,8 @@ const createCombinedImage = async (
               break;
           }
           
+          // Add white stroke for better visibility
+          ctx.strokeText(text, textX, textY);
           ctx.fillText(text, textX, textY);
         }
         
@@ -161,7 +183,7 @@ const createCombinedImage = async (
 export const downloadAsZip = async (images: ProcessedImage[]) => {
   const zip = new JSZip();
   
-  images.forEach((image, index) => {
+  images.forEach((image) => {
     const fileName = `combined_${image.name}.jpg`;
     const data = image.dataUrl.split(',')[1];
     zip.file(fileName, data, { base64: true });
