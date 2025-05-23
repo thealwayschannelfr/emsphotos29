@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Download, ArrowDown, Check, Edit2, Type, Move, ZoomIn } from 'lucide-react';
 import { ProcessedImage, TextOptions, FileData } from '../types';
 import TextOptionsPanel from './TextOptions';
-import { downloadAsZip, processImages } from '../utils/imageProcessor';
+import { downloadAsZip } from '../utils/imageProcessor';
 import TransformableImage from './TransformableImage';
 
 interface ResultsSectionProps {
@@ -22,34 +22,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [downloadedIndices, setDownloadedIndices] = useState<number[]>([]);
   const [selectedSide, setSelectedSide] = useState<'left' | 'right' | null>(null);
-  const [previewUrls, setPreviewUrls] = useState<{ [key: number]: string }>({});
-
-  useEffect(() => {
-    // Update preview when selected image changes
-    if (selectedImage !== null) {
-      updatePreview(selectedImage);
-    }
-  }, [selectedImage, processedImages]);
-
-  const updatePreview = async (index: number) => {
-    const image = processedImages[index];
-    const result = await processImages(
-      [{ file: new File([], image.name), name: image.name, preview: image.leftPhoto }],
-      [{ file: new File([], image.name), name: image.name, preview: image.rightPhoto }],
-      () => {},
-      image.textOptions || textOptions,
-      image.transform
-    );
-    
-    if (result.length > 0) {
-      setPreviewUrls(prev => ({ ...prev, [index]: result[0].dataUrl }));
-      const updatedImage = {
-        ...image,
-        dataUrl: result[0].dataUrl
-      };
-      onImageUpdate(index, updatedImage);
-    }
-  };
 
   const handleDownloadAll = async () => {
     setDownloadingAll(true);
@@ -69,7 +41,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
     setDownloadedIndices(prev => [...prev, index]);
   };
 
-  const handleTransformUpdate = async (side: 'left' | 'right', transform: any) => {
+  const handleTransformUpdate = (side: 'left' | 'right', transform: any) => {
     if (selectedImage === null) return;
     
     const updatedImage = {
@@ -79,26 +51,17 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
         [side]: transform
       }
     };
-    
     onImageUpdate(selectedImage, updatedImage);
-    await updatePreview(selectedImage);
   };
 
-  const handleTextOptionsChange = async (newOptions: TextOptions) => {
+  const handleTextOptionsChange = (newOptions: TextOptions) => {
     if (selectedImage === null) return;
     
     const updatedImage = {
       ...processedImages[selectedImage],
       textOptions: newOptions
     };
-    
     onImageUpdate(selectedImage, updatedImage);
-    await updatePreview(selectedImage);
-  };
-
-  const handleApplyChanges = async () => {
-    if (selectedImage === null) return;
-    await updatePreview(selectedImage);
   };
 
   return (
@@ -134,7 +97,7 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
             onClick={() => setSelectedImage(index)}
           >
             <img
-              src={previewUrls[index] || image.dataUrl}
+              src={image.dataUrl}
               alt={`Combined ${image.name}`}
               className="w-full h-full object-cover"
             />
@@ -175,13 +138,6 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({
           </div>
           
           <div className="flex space-x-4 mb-4">
-            <button
-              onClick={handleApplyChanges}
-              className="px-4 py-2 text-sm font-medium text-white bg-green-600 border border-transparent rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 flex items-center"
-            >
-              <Check className="h-4 w-4 mr-2" />
-              Apply Changes
-            </button>
             <button
               onClick={() => downloadImage(selectedImage)}
               className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 flex items-center"
