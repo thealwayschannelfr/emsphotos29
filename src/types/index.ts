@@ -9,6 +9,11 @@ export interface FileData {
     height: number;
   };
   zoom?: number;
+  transform?: {
+    scale: number;
+    rotation: number;
+    position: { x: number; y: number };
+  };
 }
 
 export interface ProcessedImage {
@@ -18,6 +23,16 @@ export interface ProcessedImage {
   rightPhoto: string;
   displayName?: string;
   textOptions?: TextOptions;
+  transform?: {
+    left?: Transform;
+    right?: Transform;
+  };
+}
+
+export interface Transform {
+  scale: number;
+  rotation: number;
+  position: { x: number; y: number };
 }
 
 export interface TextOptions {
@@ -26,9 +41,10 @@ export interface TextOptions {
   font: string;
   size: number;
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
-}
-
-export interface CropperState {
-  crop: { x: number; y: number };
-  zoom: number;
+  color: string;
+  bold: boolean;
+  italic: boolean;
+  stroke: boolean;
+  strokeColor: string;
+  strokeWidth: number;
 }
